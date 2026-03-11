@@ -4,6 +4,6 @@ torchvision
 facenet-pytorch
 pillow
 pandas
-numpy<2
+numpy
 grad-cam
-opencv-python-headless==4.10.0.84
+opencv-python-headless
