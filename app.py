@@ -10,9 +10,14 @@ import time
 import os
 import shutil
 # [NEW] Import for Grad-CAM
-from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.image import show_cam_on_image
-import cv2
+try:
+    from pytorch_grad_cam import GradCAM
+    from pytorch_grad_cam.utils.image import show_cam_on_image
+    import cv2
+    GRADCAM_AVAILABLE = True
+except Exception as e:
+    GRADCAM_AVAILABLE = False
+    GRADCAM_IMPORT_ERROR = str(e)
 
 # ==========================================
 # 1. SETUP & CONFIGURATION
@@ -23,7 +28,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
+if not GRADCAM_AVAILABLE:
+    st.warning(f"Grad-CAM unavailable on this deployment: {GRADCAM_IMPORT_ERROR}")
 # 🎨 CLEAN LAB DESIGN SYSTEM (CSS)
 st.markdown("""
 <style>
