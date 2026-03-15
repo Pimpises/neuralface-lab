@@ -3,6 +3,7 @@ torch
 torchvision
 facenet-pytorch
 grad-cam
+opencv-python-headless
 numpy
 pandas
 Pillow
