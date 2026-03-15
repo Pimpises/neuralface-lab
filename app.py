@@ -1,22 +1,25 @@
-import os
-import shutil
-import tempfile
-import time
-from datetime import datetime
-from pathlib import Path
-import io
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 import torch
 import torch.nn as nn
-from PIL import Image, ImageDraw
+from PIL import Image
 from facenet_pytorch import MTCNN
-from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.image import show_cam_on_image
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torchvision import models, transforms
+
+# Safe OpenCV import (fix Streamlit Cloud crash)
+try:
+    import cv2
+except Exception:
+    cv2 = None
+
+# Safe GradCAM import
+try:
+    from pytorch_grad_cam import GradCAM
+    from pytorch_grad_cam.utils.image import show_cam_on_image
+    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+except Exception:
+    GradCAM = None
 
 # ==========================================
 # 1. PAGE SETUP
@@ -509,6 +512,10 @@ def draw_max_activation_marker(gradcam_vis, grayscale_cam):
 
 
 def get_gradcam_visualizations(classifier_model, input_tensor, face_pil):
+
+    if GradCAM is None or cv2 is None:
+        return None, None, None
+
     try:
         classifier_model.eval()
         classifier_model.zero_grad()
