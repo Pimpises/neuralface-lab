@@ -1,3 +1,12 @@
+import os
+import shutil
+import tempfile
+import time
+from datetime import datetime
+from pathlib import Path
+import io
+
+import cv2
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -5,21 +14,10 @@ import torch
 import torch.nn as nn
 from PIL import Image
 from facenet_pytorch import MTCNN
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torchvision import models, transforms
-
-# Safe OpenCV import (fix Streamlit Cloud crash)
-try:
-    import cv2
-except Exception:
-    cv2 = None
-
-# Safe GradCAM import
-try:
-    from pytorch_grad_cam import GradCAM
-    from pytorch_grad_cam.utils.image import show_cam_on_image
-    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-except Exception:
-    GradCAM = None
 
 # ==========================================
 # 1. PAGE SETUP
@@ -281,6 +279,14 @@ st.markdown("""
         margin-bottom: 14px;
     }
 
+    .explain-note {
+        color: #c9d3ea;
+        font-size: 0.90rem;
+        line-height: 1.55;
+        margin-top: 8px;
+    }
+
+    /* Stronger metric text */
     [data-testid="stMetric"] {
         background: rgba(255,255,255,0.05);
         border: 1px solid rgba(255,255,255,0.10);
@@ -344,6 +350,7 @@ st.markdown("""
         margin-top: 14px;
     }
 
+    /* Buttons */
     .stButton > button, .stDownloadButton > button {
         background: linear-gradient(135deg, rgba(124,156,255,0.20), rgba(99,230,190,0.12));
         color: #ffffff !important;
@@ -359,6 +366,11 @@ st.markdown("""
         background: linear-gradient(135deg, rgba(124,156,255,0.28), rgba(99,230,190,0.18));
     }
 
+    .stButton > button[kind="secondary"], .stDownloadButton > button[kind="secondary"] {
+        color: #ffffff !important;
+    }
+
+    /* Expander */
     .streamlit-expanderHeader {
         color: #eef3ff !important;
         font-weight: 700 !important;
@@ -372,11 +384,17 @@ st.markdown("""
         color: #dbe5ff !important;
     }
 
+    /* Captions and small text */
     .stCaption, [data-testid="stCaptionContainer"] {
         color: #c7d2ea !important;
         opacity: 1 !important;
     }
 
+    p, li, label, div {
+        color: inherit;
+    }
+
+    /* Camera labels / uploader labels stronger */
     label[data-testid="stWidgetLabel"] p {
         color: #eef3ff !important;
         font-weight: 700 !important;
@@ -491,31 +509,35 @@ def draw_max_activation_marker(gradcam_vis, grayscale_cam):
         if gradcam_vis is None or grayscale_cam is None:
             return gradcam_vis
 
+        vis = gradcam_vis.copy()
         max_pos = np.unravel_index(np.argmax(grayscale_cam), grayscale_cam.shape)
         y, x = max_pos
 
-        pil_img = Image.fromarray(gradcam_vis)
-        draw = ImageDraw.Draw(pil_img)
+        cv2.circle(vis, (x, y), 10, (255, 255, 255), 2)
+        cv2.circle(vis, (x, y), 4, (255, 255, 255), -1)
 
-        r = 10
-        draw.ellipse((x - r, y - r, x + r, y + r), outline="white", width=2)
-        draw.ellipse((x - 4, y - 4, x + 4, y + 4), fill="white")
-
-        text = "Peak AI activation"
-        text_x = max(10, x - 45)
-        text_y = max(10, y - 20)
-        draw.text((text_x, text_y), text, fill="white")
-
-        return np.array(pil_img)
+        cv2.putText(
+            vis,
+            "Peak AI activation",
+            (max(10, x - 45), max(25, y - 15)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA
+        )
+        return vis
     except Exception:
         return gradcam_vis
 
 
 def get_gradcam_visualizations(classifier_model, input_tensor, face_pil):
-
-    if GradCAM is None or cv2 is None:
-        return None, None, None
-
+    """
+    Return:
+    1) plain Grad-CAM overlay
+    2) annotated Grad-CAM overlay with peak marker
+    3) raw grayscale cam
+    """
     try:
         classifier_model.eval()
         classifier_model.zero_grad()
@@ -530,9 +552,10 @@ def get_gradcam_visualizations(classifier_model, input_tensor, face_pil):
             face_np = np.array(face_pil).astype(np.float32) / 255.0
 
             if grayscale_cam.shape != face_np.shape[:2]:
-                cam_img = Image.fromarray((grayscale_cam * 255).astype(np.uint8))
-                cam_img = cam_img.resize((face_np.shape[1], face_np.shape[0]), Image.BILINEAR)
-                grayscale_cam = np.array(cam_img).astype(np.float32) / 255.0
+                grayscale_cam = cv2.resize(
+                    grayscale_cam,
+                    (face_np.shape[1], face_np.shape[0])
+                )
 
             plain_vis = show_cam_on_image(face_np, grayscale_cam, use_rgb=True)
             annotated_vis = draw_max_activation_marker(plain_vis, grayscale_cam)
