@@ -2,8 +2,8 @@ streamlit
 torch
 torchvision
 facenet-pytorch
-grad-cam
-opencv-python-headless
+pytorch-grad-cam
+opencv-python
 numpy
 pandas
 Pillow
