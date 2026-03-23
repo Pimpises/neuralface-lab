@@ -662,7 +662,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        "<div class='footer-mini'>NeuralFace Lab · 2026 Demo Interface<br>DeepFake Detection + XAI</div>",
+        "<div class='footer-mini'>NeuralFace Lab · 2026 Demo Interface<br>Detection of Al-Generated + XAI</div>",
         unsafe_allow_html=True
     )
 
@@ -676,8 +676,8 @@ gradcam_chip = "Grad-CAM Ready" if GRADCAM_AVAILABLE else "Grad-CAM Optional"
 
 st.markdown(f"""
 <div class="hero-card">
-    <div class="hero-kicker">NeuralFace Lab · 2026 Interface</div>
-    <div class="hero-title">AI Face Authenticity Analysis</div>
+    <div class="hero-kicker">การตรวจจับใบหน้าที่ถูกสร้างขึ้นมาจากปัญญาประดิษฐ์ ด้วยโครงข่ายประสาทเทียมแบบคอนโวลูชัน</div>
+    <div class="hero-title">Detection of Al-Generated Faces Using Convolutional Neural Networks</div>
     <div class="hero-desc">
         End-to-end demo for <b>Real vs AI-generated face detection</b> using
         <b>EfficientNet-B1</b>, automatic face extraction, and optional <b>Grad-CAM</b> for explainability.
