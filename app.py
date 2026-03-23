@@ -14,10 +14,20 @@ import torch
 import torch.nn as nn
 from PIL import Image
 from facenet_pytorch import MTCNN
-from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.image import show_cam_on_image
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torchvision import models, transforms
+
+# =========================
+# SAFE IMPORT: GRAD-CAM
+# =========================
+try:
+    from pytorch_grad_cam import GradCAM
+    from pytorch_grad_cam.utils.image import show_cam_on_image
+    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+    GRADCAM_AVAILABLE = True
+    GRADCAM_IMPORT_ERROR = None
+except Exception as e:
+    GRADCAM_AVAILABLE = False
+    GRADCAM_IMPORT_ERROR = str(e)
 
 # ==========================================
 # 1. PAGE SETUP
@@ -32,8 +42,12 @@ st.set_page_config(
 # ==========================================
 # 2. APP CONFIG
 # ==========================================
-MODEL_PATH = "Model/efficientnet_b1_cropped_face_paper_tech_best.pth"
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "Model" / "efficientnet_b1_cropped_face_paper_tech_best.pth"
+ASSETS_DIR = BASE_DIR / "assets" / "examples"
+
+# Streamlit Cloud ส่วนมากไม่มี GPU
+DEVICE = torch.device("cpu")
 
 REAL_CLASS_INDEX = 0
 AI_CLASS_INDEX = 1
@@ -51,7 +65,7 @@ if "camera_log" not in st.session_state:
     st.session_state.camera_log = []
 
 # ==========================================
-# 3. DESIGN SYSTEM (2026 UI)
+# 3. DESIGN SYSTEM
 # ==========================================
 st.markdown("""
 <style>
@@ -279,14 +293,13 @@ st.markdown("""
         margin-bottom: 14px;
     }
 
-    .explain-note {
-        color: #c9d3ea;
-        font-size: 0.90rem;
-        line-height: 1.55;
-        margin-top: 8px;
+    .footer-mini {
+        color: #b1bfdc;
+        font-size: 0.84rem;
+        text-align: center;
+        margin-top: 14px;
     }
 
-    /* Stronger metric text */
     [data-testid="stMetric"] {
         background: rgba(255,255,255,0.05);
         border: 1px solid rgba(255,255,255,0.10);
@@ -343,14 +356,6 @@ st.markdown("""
         border-radius: 999px;
     }
 
-    .footer-mini {
-        color: #b1bfdc;
-        font-size: 0.84rem;
-        text-align: center;
-        margin-top: 14px;
-    }
-
-    /* Buttons */
     .stButton > button, .stDownloadButton > button {
         background: linear-gradient(135deg, rgba(124,156,255,0.20), rgba(99,230,190,0.12));
         color: #ffffff !important;
@@ -366,11 +371,6 @@ st.markdown("""
         background: linear-gradient(135deg, rgba(124,156,255,0.28), rgba(99,230,190,0.18));
     }
 
-    .stButton > button[kind="secondary"], .stDownloadButton > button[kind="secondary"] {
-        color: #ffffff !important;
-    }
-
-    /* Expander */
     .streamlit-expanderHeader {
         color: #eef3ff !important;
         font-weight: 700 !important;
@@ -384,7 +384,6 @@ st.markdown("""
         color: #dbe5ff !important;
     }
 
-    /* Captions and small text */
     .stCaption, [data-testid="stCaptionContainer"] {
         color: #c7d2ea !important;
         opacity: 1 !important;
@@ -394,7 +393,6 @@ st.markdown("""
         color: inherit;
     }
 
-    /* Camera labels / uploader labels stronger */
     label[data-testid="stWidgetLabel"] p {
         color: #eef3ff !important;
         font-weight: 700 !important;
@@ -441,10 +439,10 @@ def load_engine():
             classifier_model.classifier[1].in_features, 2
         )
 
-        if not os.path.exists(MODEL_PATH):
+        if not MODEL_PATH.exists():
             return None, None, False, f"Model file not found at: {MODEL_PATH}"
 
-        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
+        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
         state_dict = extract_state_dict(checkpoint)
         classifier_model.load_state_dict(state_dict, strict=True)
 
@@ -532,12 +530,9 @@ def draw_max_activation_marker(gradcam_vis, grayscale_cam):
 
 
 def get_gradcam_visualizations(classifier_model, input_tensor, face_pil):
-    """
-    Return:
-    1) plain Grad-CAM overlay
-    2) annotated Grad-CAM overlay with peak marker
-    3) raw grayscale cam
-    """
+    if not GRADCAM_AVAILABLE:
+        return None, None, None
+
     try:
         classifier_model.eval()
         classifier_model.zero_grad()
@@ -563,7 +558,7 @@ def get_gradcam_visualizations(classifier_model, input_tensor, face_pil):
             return plain_vis, annotated_vis, grayscale_cam
 
     except Exception as e:
-        st.error(f"Grad-CAM Error Details: {str(e)}")
+        st.warning(f"Grad-CAM unavailable for this image: {str(e)}")
         return None, None, None
 
 
@@ -585,7 +580,8 @@ def inference(img_pil, generate_gradcam=False):
 
     gradcam_plain = None
     gradcam_annotated = None
-    if generate_gradcam:
+
+    if generate_gradcam and GRADCAM_AVAILABLE:
         gradcam_plain, gradcam_annotated, _ = get_gradcam_visualizations(
             model,
             input_tensor,
@@ -652,6 +648,12 @@ with st.sidebar:
         if model_error:
             st.caption(model_error)
 
+    if not GRADCAM_AVAILABLE:
+        st.markdown("---")
+        st.warning("Grad-CAM module unavailable")
+        if GRADCAM_IMPORT_ERROR:
+            st.caption(GRADCAM_IMPORT_ERROR)
+
     st.markdown("---")
     st.markdown("**Input Recommendation**")
     st.caption(
@@ -670,6 +672,7 @@ with st.sidebar:
 device_text = str(DEVICE).upper()
 model_status_chip = "good" if model_loaded else "warn"
 model_status_text = "Model Ready" if model_loaded else "Model Offline"
+gradcam_chip = "Grad-CAM Ready" if GRADCAM_AVAILABLE else "Grad-CAM Optional"
 
 st.markdown(f"""
 <div class="hero-card">
@@ -677,15 +680,14 @@ st.markdown(f"""
     <div class="hero-title">AI Face Authenticity Analysis</div>
     <div class="hero-desc">
         End-to-end demo for <b>Real vs AI-generated face detection</b> using
-        <b>EfficientNet-B1</b>, automatic face extraction, and <b>Grad-CAM</b> for explainability.
-        This interface is designed to demonstrate that the trained model can be used in a real application workflow.
+        <b>EfficientNet-B1</b>, automatic face extraction, and optional <b>Grad-CAM</b> for explainability.
     </div>
     <div class="status-chip-row">
         <div class="status-chip {model_status_chip}">{model_status_text}</div>
         <div class="status-chip">Backend: EfficientNet-B1</div>
         <div class="status-chip">Detector: MTCNN</div>
         <div class="status-chip">Device: {device_text}</div>
-        <div class="status-chip">XAI: Grad-CAM</div>
+        <div class="status-chip">{gradcam_chip}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -711,10 +713,10 @@ with m2:
     """, unsafe_allow_html=True)
 
 with m3:
-    st.markdown("""
+    st.markdown(f"""
     <div class="metric-panel">
         <div class="label">Explainability</div>
-        <div class="value">Active</div>
+        <div class="value">{'Active' if GRADCAM_AVAILABLE else 'Fallback'}</div>
         <div class="sub">Visual evidence through Grad-CAM heatmaps</div>
     </div>
     """, unsafe_allow_html=True)
@@ -761,9 +763,9 @@ with tab_single:
         with st.expander("Example input cases"):
             e1, e2, e3 = st.columns(3)
             example_paths = [
-                "assets/examples/example_real_1.jpg",
-                "assets/examples/example_ai_1.jpg",
-                "assets/examples/example_real_2.jpg"
+                ASSETS_DIR / "example_real_1.jpg",
+                ASSETS_DIR / "example_ai_1.jpg",
+                ASSETS_DIR / "example_real_2.jpg"
             ]
             example_captions = [
                 "Clear frontal real face",
@@ -772,8 +774,8 @@ with tab_single:
             ]
             for col, path, cap in zip([e1, e2, e3], example_paths, example_captions):
                 with col:
-                    if os.path.exists(path):
-                        st.image(path, caption=cap, use_container_width=True)
+                    if path.exists():
+                        st.image(str(path), caption=cap, use_container_width=True)
                     else:
                         st.caption(cap)
                         st.write("Example not found")
@@ -813,9 +815,13 @@ with tab_single:
         if uploaded_file and img is not None:
             enable_gradcam = st.toggle(
                 "Enable Grad-CAM visualization",
-                value=True,
+                value=GRADCAM_AVAILABLE,
+                disabled=not GRADCAM_AVAILABLE,
                 help="Show the regions that contribute most to AI-class evidence."
             )
+
+            if not GRADCAM_AVAILABLE:
+                st.caption("Grad-CAM is not available in this environment. Classification still works.")
 
             with st.spinner("Analyzing image..."):
                 start_time = time.time()
@@ -1067,7 +1073,8 @@ with tab_camera:
 
         enable_camera_gradcam = st.toggle(
             "Enable Grad-CAM for captured frame",
-            value=True,
+            value=GRADCAM_AVAILABLE,
+            disabled=not GRADCAM_AVAILABLE,
             key="camera_gradcam_toggle",
             help="Generate Grad-CAM after capturing an image from the webcam."
         )
@@ -1295,7 +1302,6 @@ with tab_camera:
             with d2:
                 if st.button("Clear Camera Log", key="clear_camera_log"):
                     st.session_state.camera_log = []
-                    st.toast("Camera log cleared.")
                     st.rerun()
         else:
             st.caption("No webcam analysis results yet.")
