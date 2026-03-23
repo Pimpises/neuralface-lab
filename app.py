@@ -681,7 +681,7 @@ st.markdown(f"""
     <div class="hero-desc">
         End-to-end demo for <b>Real vs AI-generated face detection</b> using
         <b>EfficientNet-B1</b>, automatic face extraction, and optional <b>Grad-CAM</b> for explainability.
-        <b> 67199160150 นาย พิมพ์พิเศษ ฉุนมี </b>
+         /n \n<b> 67199160150 นาย พิมพ์พิเศษ ฉุนมี </b>
     </div>
     <div class="status-chip-row">
         <div class="status-chip {model_status_chip}">{model_status_text}</div>
