@@ -1,9 +1,9 @@
-streamlit
-torch
-torchvision
-facenet-pytorch
-pytorch-grad-cam
-opencv-python
+streamlit==1.55.0
+torch==2.10.0
+torchvision==0.25.0
+facenet-pytorch==2.6.0
+grad-cam==1.5.5
+opencv-python-headless
 numpy
 pandas
 Pillow
