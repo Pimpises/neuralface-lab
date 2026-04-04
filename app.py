@@ -43,7 +43,7 @@ st.set_page_config(
 # 2. APP CONFIG
 # ==========================================
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "Model" / "efficientnet_b1_cropped_face_paper_tech_best.pth"
+MODEL_PATH = BASE_DIR / "Model" / "efficientnet_b1_cropped_face_paper_tech_best_Main.pth"
 ASSETS_DIR = BASE_DIR / "assets" / "examples"
 
 # Streamlit Cloud ส่วนมากไม่มี GPU
